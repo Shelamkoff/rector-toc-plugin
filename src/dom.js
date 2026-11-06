@@ -35,8 +35,36 @@ export function createTocView(document, { anchorPrefix, navigate } = {}) {
   }
   nav.addEventListener('click', handleClick)
 
+  let previousLayout = null
+  let previousVisible = []
+  let renderedLinks = new Map()
+  let destroyed = false
+
   const render = (data, headings) => {
+    if (destroyed) return
     const config = normalizeTocData(data)
+    const visible = headings.filter(entry => entry.level >= config.minLevel && entry.level <= config.maxLevel)
+    const layout = JSON.stringify([config.title, config.minLevel, config.maxLevel, config.numbered])
+    const stable = previousLayout === layout
+      && previousVisible.length === visible.length
+      && visible.every((item, index) => item.id === previousVisible[index].id
+        && item.level === previousVisible[index].level
+        && renderedLinks.has(item.id))
+    if (stable) {
+      // A single heading edit changes only its text. Retain every link,
+      // nested list, focus owner, listener and structural DOM node.
+      for (let index = 0; index < visible.length; index++) {
+        const entry = visible[index]
+        if (entry.text !== previousVisible[index].text) {
+          renderedLinks.get(entry.id).textContent = entry.text
+        }
+      }
+      previousVisible = visible
+      return
+    }
+    previousLayout = layout
+    previousVisible = visible
+    renderedLinks = new Map()
     const active = document.activeElement
     const focusedId = active && nav.contains(active)
       ? active.closest?.('a[data-toc-target]')?.dataset.tocTarget
@@ -71,6 +99,7 @@ export function createTocView(document, { anchorPrefix, navigate } = {}) {
         link.dataset.tocTarget = node.id
         link.setAttribute('href', '#' + tocAnchorId(node.id, anchorPrefix))
         link.textContent = node.text
+        renderedLinks.set(node.id, link)
         if (node.id === focusedId) nextFocusedLink = link
         item.appendChild(link)
         if (node.children.length) appendList(item, node.children)
@@ -79,12 +108,22 @@ export function createTocView(document, { anchorPrefix, navigate } = {}) {
       parent.appendChild(list)
     }
     appendList(nav, roots)
-    // Heading edits recreate the TOC DOM. Keep keyboard navigation on the
-    // same logical heading, or on the nav when that heading was removed.
+    // Structural edits may rebuild nested lists. Retain logical focus by ID,
+    // or focus the navigation when the selected heading is gone.
     if (focusedId) (nextFocusedLink ?? nav).focus({ preventScroll: true })
   }
 
-  return { element: nav, render, destroy() { nav.removeEventListener('click', handleClick) } }
+  return {
+    element: nav,
+    render,
+    destroy() {
+      if (destroyed) return
+      destroyed = true
+      nav.removeEventListener('click', handleClick)
+      renderedLinks.clear()
+      previousVisible = []
+    },
+  }
 }
 
 /** Add permanent fragment targets after EditorRenderer.renderTo or render(). */
