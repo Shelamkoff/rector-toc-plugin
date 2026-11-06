@@ -56,6 +56,9 @@ try {
   const toc = editorNode.querySelector('nav.rector-toc')
   assert(toc !== null, 'TOC plugin mounts in actual Rector')
   equal(labels(toc), ['Introduction', 'Details'], 'initial heading extraction')
+  toc.focus()
+  assert(document.activeElement === toc,
+    'TOC block navigation can receive programmatic keyboard focus')
   assert(toc.querySelector('ol') === null && toc.querySelector('ul') !== null, 'default bullets')
   equal(toc.querySelector('a').getAttribute('href'), '#' + tocAnchorId('intro'), 'stable anchor URL')
   let committed = 0
