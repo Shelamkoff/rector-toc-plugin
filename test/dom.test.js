@@ -232,3 +232,49 @@ test('a failing TOC heading projection must not change the mounted renderer outp
   assert.deepEqual(source.getHeadings().map(entry => entry.text), ['Before'])
   source.destroy()
 })
+
+
+test('a failed TOC renderer subscription releases its detached navigation listeners', () => {
+  let nav
+  const ownerDocument = {
+    createElement(tag) {
+      const element = document.createElement(tag)
+      if (tag === 'nav') nav = element
+      return element
+    },
+  }
+  const renderer = createTocRenderer({
+    injectStyles: false,
+    source: {
+      getHeadings: () => [],
+      subscribe() { throw new Error('subscription rejected') },
+    },
+  })
+  assert.throws(
+    () => renderer.render(documentData.blocks[1], null, { ownerDocument }),
+    /subscription rejected/,
+  )
+  assert.ok(nav)
+  assert.equal(nav.events.get('click')?.size ?? 0, 0,
+    'a discarded TOC view must not retain listeners')
+})
+
+test('a failing renderer unsubscribe cannot prevent navigation cleanup', () => {
+  let calls = 0
+  const renderer = createTocRenderer({
+    injectStyles: false,
+    source: {
+      getHeadings: () => [],
+      subscribe() {
+        return () => { calls++; throw new Error('unsubscribe rejected') }
+      },
+    },
+  })
+  const nav = renderer.render(documentData.blocks[1], null, { ownerDocument: document })
+  assert.equal(nav.events.get('click')?.size, 1)
+  assert.throws(() => renderer.destroy(nav), /unsubscribe rejected/)
+  assert.equal(nav.events.get('click')?.size, 0,
+    'renderer must release own DOM listeners independently of source cleanup')
+  assert.doesNotThrow(() => renderer.destroy(nav))
+  assert.equal(calls, 1)
+})
