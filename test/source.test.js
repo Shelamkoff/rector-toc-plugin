@@ -257,3 +257,20 @@ test('two prepared snapshots committed out of order retain the newer publication
   assert.deepEqual(source.getHeadings().map(x => x.text), ['Later'])
   source.destroy()
 })
+
+
+test('accepting a newer document with unchanged headings invalidates old prepared work', () => {
+  const source = createTocSource({ document: doc(heading('h', 'Stable')) })
+  const obsolete = source.prepareDocument(doc(heading('h', 'Obsolete')))
+  const notifications = []
+  source.subscribe(entries => notifications.push(entries.map(x => x.text).join(',')))
+  // A later accepted document can modify paragraphs but keep the same TOC.
+  source.setDocument(doc(
+    heading('h', 'Stable'),
+    { id: 'body', type: 'paragraph', data: { text: 'Updated paragraph' } },
+  ))
+  obsolete()
+  assert.deepEqual(source.getHeadings().map(x => x.text), ['Stable'])
+  assert.deepEqual(notifications, [])
+  source.destroy()
+})
