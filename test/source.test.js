@@ -172,3 +172,21 @@ test('reentrant updates notify remaining subscribers once with the latest headin
   assert.deepEqual(source.getHeadings().map(h => h.text), ['Latest'])
   source.destroy()
 })
+
+
+test('binding observes a heading edit triggered by initial TOC subscribers', () => {
+  const editor = createMockEditor(doc(heading('a', 'First')))
+  const source = createTocSource()
+  source.subscribe(headings => {
+    if (headings[0]?.text !== 'First') return
+    editor.setDocument(doc(heading('a', 'Second')))
+    editor.emit('transaction:committed', {
+      changes: [{ kind: 'block.update',
+        id: 'a', before: heading('a', 'First'), after: heading('a', 'Second') }],
+    })
+  })
+  const unbind = source.bindEditor(editor)
+  assert.deepEqual(source.getHeadings().map(item => item.text), ['Second'])
+  unbind()
+  source.destroy()
+})
