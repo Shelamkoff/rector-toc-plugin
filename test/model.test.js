@@ -129,3 +129,14 @@ test('decode full HTML5 named and legacy numeric entities exactly once in headin
   assert.equal(htmlToText('&amp;copy; &unknown;'), '&copy; &unknown;')
   assert.equal(htmlToText('Break&nbsp;space &eacute;'), 'Break space é')
 })
+
+test('explicit null is invalid for each TOC setting, while omitted values use defaults', () => {
+  assert.deepEqual(tocSchema.decode({ dataVersion: 1, data: {} }).data, DEFAULT_TOC_DATA)
+  for (const field of ['title', 'minLevel', 'maxLevel', 'numbered']) {
+    assert.throws(
+      () => tocSchema.decode({ dataVersion: 1, data: { [field]: null } }),
+      { name: field === 'minLevel' || field === 'maxLevel' ? 'RangeError' : 'TypeError' },
+      'explicit null must not silently become a default for ' + field,
+    )
+  }
+})
