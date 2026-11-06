@@ -79,3 +79,24 @@ test('malformed HTML-like tails are handled without quadratic rescanning', () =>
   assert.equal(htmlToText(malformed), malformed.trim())
   assert.ok(performance.now() - start < 500, 'tagless malformed HTML must be processed linearly')
 })
+
+test('only real inline tokens resolve; entity-escaped and markup-split braces remain literal', () => {
+  const source = {
+    version: '2.0.0',
+    blocks: [{
+      id: 'heading-a',
+      type: 'heading',
+      data: {
+        level: 2,
+        text: 'Literal &#123;&#123;ref&#125;&#125; / linked {{ref}} / split {{<em>ref</em>}}',
+      },
+      inline: { ref: { type: 'mention', data: { label: 'Alice &lt;Admin&gt;' } } },
+    }],
+  }
+  const headings = collectTocHeadings(source, {
+    inlineToText: widget => widget.data.label,
+  })
+  assert.deepEqual(headings.map(h => h.text), [
+    'Literal {{ref}} / linked Alice &lt;Admin&gt; / split {{ref}}',
+  ])
+})
