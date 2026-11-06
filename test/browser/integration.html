@@ -61,10 +61,15 @@ try {
     'TOC block navigation can receive programmatic keyboard focus')
   assert(toc.querySelector('ol') === null && toc.querySelector('ul') !== null, 'default bullets')
   equal(toc.querySelector('a').getAttribute('href'), '#' + tocAnchorId('intro'), 'stable anchor URL')
+  const focusedLink = toc.querySelector('a[data-toc-target="intro"]')
+  focusedLink.focus()
+  assert(document.activeElement === focusedLink, 'TOC link accepts keyboard focus')
   let committed = 0
   editor.on('transaction:committed', () => committed++)
   editor.blocks.update('intro', () => ({ data: { text: 'Changed &amp; more', level: 2 } }))
   equal(labels(toc), ['Changed & more', 'Details'], 'model-first heading edit updates TOC')
+  assert(document.activeElement === toc.querySelector('a[data-toc-target="intro"]'),
+    'live TOC update preserves focused navigation target')
   equal(committed, 1, 'TOC update adds no author transaction')
   assert(editor.undo(), 'undo works')
   equal(labels(toc), ['Introduction', 'Details'], 'undo restores TOC labels')
