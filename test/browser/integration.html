@@ -77,8 +77,13 @@ try {
   equal(labels(toc), ['Changed & more', 'Details'], 'redo restores TOC labels')
   editor.blocks.move('child', 0)
   equal(labels(toc), ['Details', 'Changed & more'], 'heading reorder updates TOC')
+  const removedLink = toc.querySelector('a[data-toc-target="child"]')
+  removedLink.focus()
+  assert(document.activeElement === removedLink, 'TOC link targeted for deletion receives focus')
   editor.blocks.remove('child')
   equal(labels(toc), ['Changed & more'], 'heading deletion updates TOC')
+  assert(document.activeElement === toc,
+    'removing the currently focused heading leaves focus on the TOC navigation')
 
   editor.setReadOnly(true)
   editor.blocks.update('intro', () => ({ data: { text: 'From host', level: 2 } }))
