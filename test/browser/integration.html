@@ -80,6 +80,8 @@ try {
   editor.on('transaction:committed', () => committed++)
   editor.blocks.update('intro', () => ({ data: { text: 'Changed &amp; more', level: 2 } }))
   equal(labels(toc), ['Changed & more', 'Details'], 'model-first heading edit updates TOC')
+  assert(toc.querySelector('a[data-toc-target="intro"]') === focusedLink,
+    'editing a heading updates its TOC label without replacing its DOM link')
   assert(document.activeElement === toc.querySelector('a[data-toc-target="intro"]'),
     'live TOC update preserves focused navigation target')
   equal(committed, 1, 'TOC update adds no author transaction')
