@@ -36,7 +36,7 @@ test('source emits only semantic heading changes, not paragraphs or identical sn
   assert.equal(editor.saves, 1)
   editor.setDocument(doc(heading('a', 'Changed')))
   editor.emit('transaction:committed', { changes: [{ kind: 'block.update', before: heading('a', 'Start'), after: heading('a', 'Changed') }] })
-  assert.equal(editor.saves, 2)
+  assert.equal(editor.saves, 1)
   assert.deepEqual(seen, ['Changed'])
   source.setDocument(doc(heading('a', 'Changed')))
   assert.deepEqual(seen, ['Changed'])

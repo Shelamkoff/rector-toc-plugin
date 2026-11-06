@@ -86,6 +86,26 @@ export function createTocSource(options = {}) {
     }
   }
 
+  // The common case is one canonical update to an existing visible Heading.
+  // Use the immutable transaction payload rather than serializing the entire
+  // document on every native keystroke. Structural/multi-block changes and
+  // stale external snapshots deliberately fall back to editor.save().
+  const applySingleHeadingUpdate = changes => {
+    if (!Array.isArray(changes) || changes.length !== 1) return false
+    const change = changes[0]
+    if (change.kind !== 'block.update' || change.before?.type !== 'heading'
+      || change.after?.type !== 'heading' || change.after.id !== change.id) return false
+    const index = headings.findIndex(item => item.id === change.id)
+    if (index === -1) return false
+    const before = collectTocHeadings({ blocks: [change.before] }, extraction)[0]
+    const after = collectTocHeadings({ blocks: [change.after] }, extraction)[0]
+    if (!before || !after || !sameHeadings([headings[index]], [before])) return false
+    const next = [...headings]
+    next[index] = after
+    publishHeadings(Object.freeze(next))
+    return true
+  }
+
   const bindEditor = editor => {
     assertLive()
     if (binding) throw new Error('TOC source is already bound to an editor')
@@ -122,7 +142,9 @@ export function createTocSource(options = {}) {
           || change.kind === 'block.update'
             && (change.before?.type === 'heading' || change.after?.type === 'heading'))
         if (relevant) {
-          try { setDocument(editor.save()) } catch (error) { report(error) }
+          try {
+            if (!applySingleHeadingUpdate(event.changes)) setDocument(editor.save())
+          } catch (error) { report(error) }
         }
       })
       if (typeof committed !== 'function') throw new TypeError('Editor event subscription must return an unsubscribe function')
