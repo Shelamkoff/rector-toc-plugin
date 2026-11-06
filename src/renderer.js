@@ -26,10 +26,27 @@ export function createTocRenderer(options = {}) {
     render(block, _parseInline, context = { ownerDocument: globalThis.document }) {
       const data = tocSchema.decode({ dataVersion: block.dataVersion, data: block.data }).data
       const view = createTocView(context.ownerDocument, { anchorPrefix, navigate })
-      view.render(data, source.getHeadings())
-      const unsubscribe = source.subscribe(headings => view.render(data, headings))
-      mounted.set(view.element, () => { unsubscribe(); view.destroy() })
-      return view.element
+      try {
+        view.render(data, source.getHeadings())
+        const unsubscribe = source.subscribe(headings => view.render(data, headings))
+        if (typeof unsubscribe !== 'function') {
+          throw new TypeError('TOC source.subscribe must return an unsubscribe function')
+        }
+        let disposed = false
+        mounted.set(view.element, () => {
+          if (disposed) return
+          disposed = true
+          // The source is application-owned; a failing unsubscribe must not
+          // retain the renderer's own navigation event listener.
+          try { unsubscribe() }
+          finally { view.destroy() }
+        })
+        return view.element
+      } catch (error) {
+        // The renderer never received this output, so Rector cannot destroy it.
+        view.destroy()
+        throw error
+      }
     },
     destroy(element) {
       const cleanup = mounted.get(element)
