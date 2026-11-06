@@ -96,10 +96,9 @@ export function createTocSource(options = {}) {
     // They can synchronously destroy it, attempt a second binding, or throw.
     binding = unbind
     try {
-      setDocument(editor.save())
-      assertLive()
-      if (!active) throw new Error('TOC source retired during editor binding')
-
+      // Observe commits BEFORE publishing the initial snapshot. Subscribers
+      // may synchronously edit the document in response to that publication;
+      // registering afterward would drop their committed changes.
       const committed = editor.on('transaction:committed', event => {
         if (!active) return
         const relevant = event.changes.some(change =>
@@ -119,6 +118,11 @@ export function createTocSource(options = {}) {
       if (typeof destroyed !== 'function') throw new TypeError('Editor event subscription must return an unsubscribe function')
       if (!active) { destroyed(); throw new Error('TOC source retired during editor binding') }
       offDestroyed = destroyed
+      // Re-read the canonical model after both observers are installed.
+      // A nested update during notification will now be delivered normally.
+      setDocument(editor.save())
+      assertLive()
+      if (!active) throw new Error('TOC source retired during editor binding')
       return unbind
     } catch (error) {
       unbind()
