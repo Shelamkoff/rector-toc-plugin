@@ -72,3 +72,10 @@ test('anchor IDs are deterministic, injective for arbitrary block ids and safe',
   assert.ok(ids.every(id => /^rector-toc-heading-[0-9a-f]+$/.test(id)))
   assert.throws(() => tocAnchorId('x', 'foo#'), /prefix/)
 })
+
+test('malformed HTML-like tails are handled without quadratic rescanning', () => {
+  const malformed = '<a '.repeat(15000)
+  const start = performance.now()
+  assert.equal(htmlToText(malformed), malformed.trim())
+  assert.ok(performance.now() - start < 500, 'tagless malformed HTML must be processed linearly')
+})

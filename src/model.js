@@ -81,7 +81,9 @@ export function htmlToText(html) {
       if (char === '"' || char === "'") quote = char
       else if (char === '>') break
     }
-    if (j === html.length) { result += html[i++]; continue }
+    // No terminating tag: the remaining input is literal text. Do not rescan
+    // its suffix at every subsequent '<' (quadratic on malformed HTML).
+    if (j === html.length) { result += html.slice(i); break }
     const tag = html.slice(i + 1, j).trim().toLowerCase()
     if (/^\/?(?:br|p|div|li)(?:\s|\/|$)/.test(tag)) result += ' '
     i = j + 1
