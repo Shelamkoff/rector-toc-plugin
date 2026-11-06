@@ -166,3 +166,43 @@ test('a rejected output render must not publish headings from the failed documen
   assert.deepEqual(source.getHeadings().map(item => item.text), ['Start', 'Child'])
   source.destroy()
 })
+
+test('aborting during TOC registration immediately releases the source subscription', () => {
+  const controller = new AbortController()
+  let releases = 0
+  const source = {
+    getHeadings: () => [],
+    subscribe() {
+      controller.abort()
+      return () => { releases++ }
+    },
+  }
+  const plugin = createTocPlugin({ source, injectStyles: false })
+  const runtime = plugin.setup({})
+  const instance = runtime.create(plugin.schema.createDefault(), {
+    ownerDocument: document, signal: controller.signal, isReadOnly: () => false,
+  })
+  assert.equal(releases, 1, 'a retired block cannot retain an active TOC subscription')
+  instance.destroy()
+  assert.equal(releases, 1, 'cleanup must not release the same subscription twice')
+  runtime.destroy()
+})
+
+test('block abort followed by destroy releases an external TOC subscription exactly once', () => {
+  const controller = new AbortController()
+  let releases = 0
+  const source = {
+    getHeadings: () => [],
+    subscribe: () => () => { releases++ },
+  }
+  const plugin = createTocPlugin({ source, injectStyles: false })
+  const runtime = plugin.setup({})
+  const instance = runtime.create(plugin.schema.createDefault(), {
+    ownerDocument: document, signal: controller.signal, isReadOnly: () => false,
+  })
+  controller.abort()
+  assert.equal(releases, 1, 'abort releases the source subscription')
+  instance.destroy()
+  assert.equal(releases, 1, 'block destruction is idempotent after abort')
+  runtime.destroy()
+})
