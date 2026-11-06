@@ -34,3 +34,5 @@ jobs:
         run: node rector/node_modules/typescript/bin/tsc -p tsconfig.integration.json
       - name: Verify with real Rector v2 in Chromium
         run: node test/browser/run.mjs
+      - name: Verify consumer installation from npm tarballs
+        run: node test/package-consumer.mjs
