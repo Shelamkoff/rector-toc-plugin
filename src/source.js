@@ -63,8 +63,12 @@ export function createTocSource(options = {}) {
       if (!active) return
       active = false
       if (binding === unbind) binding = null
-      offCommitted()
-      offDestroyed()
+      const releases = [offCommitted, offDestroyed]
+      offCommitted = () => {}
+      offDestroyed = () => {}
+      for (const release of releases) {
+        try { release() } catch (error) { report(error) }
+      }
     }
     // Claim this source before calling application-owned save/observers.
     // They can synchronously destroy it, attempt a second binding, or throw.
@@ -113,8 +117,9 @@ export function createTocSource(options = {}) {
     },
     destroy() {
       if (destroyed) return
-      binding?.()
+      // Revoke before consumer-owned unsubscribe hooks run.
       destroyed = true
+      binding?.()
       subscribers.clear()
       headings = Object.freeze([])
     },
