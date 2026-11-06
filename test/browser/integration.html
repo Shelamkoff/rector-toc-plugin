@@ -37,6 +37,7 @@ const labels = nav => [...nav.querySelectorAll('a[data-toc-target]')].map(x => x
 const editorNode = document.querySelector('#editor')
 const articleNode = document.querySelector('#article')
 let editor, renderer, source, renderedSource, unbind
+let styledEditor, styledSource, styleHolder
 
 try {
   source = createTocSource()
@@ -174,6 +175,52 @@ try {
   renderer.destroy()
   renderedSource.setDocument(documentData(heading('ignored', 'Ignored')))
   equal(labels(mounted), ['Last title'], 'destroyed renderer unsubscribes from TOC')
+
+  // Verify the default (non-opted-out) style path in the real browser. This
+  // also exercises independent editor/source ownership on the same Document.
+  styledSource = createTocSource()
+  styleHolder = document.createElement('div')
+  document.body.appendChild(styleHolder)
+  const styledPlugin = createTocPlugin({ source: styledSource })
+  const tocStyleUrl = styledPlugin.styles[0]
+  assert(typeof tocStyleUrl === 'string' && tocStyleUrl.endsWith('/toc.css'),
+    'default TOC plugin advertises its real stylesheet URL')
+  const tocStyles = () => [...document.querySelectorAll('link[data-oe-style]')]
+    .filter(link => link.href === tocStyleUrl)
+  assert(tocStyles().length === 0, 'host-managed TOC CSS from the first editor was not injected')
+  styledEditor = createEditor({
+    holder: styleHolder,
+    plugins: [
+      createParagraphPlugin({ injectStyles: false }),
+      createHeadingPlugin({ injectStyles: false }),
+      styledPlugin,
+    ],
+    data: documentData(heading('styled', 'Independent editor'), tocBlock),
+    blockInsertAnimationMs: 0,
+    blockMoveAnimationMs: 0,
+    blockRemoveAnimationMs: 0,
+  })
+  styledSource.bindEditor(styledEditor)
+  equal(labels(styleHolder.querySelector('nav.rector-toc')), ['Independent editor'],
+    'a second editor receives its own TOC heading snapshot')
+  equal(tocStyles().length, 1, 'default TOC CSS acquired exactly once')
+  const styleLink = tocStyles()[0]
+  for (let attempt = 0; attempt < 60 && !styleLink.sheet; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, 50))
+  }
+  assert(styleLink.sheet !== null, 'TOC stylesheet loaded successfully from Vite')
+  assert(getComputedStyle(styleHolder.querySelector('nav.rector-toc')).paddingTop !== '0px',
+    'default TOC CSS applies computed styles to the navigation')
+  styledEditor.blocks.update('styled', () => ({ data: { text: 'Updated independently', level: 2 } }))
+  equal(labels(styleHolder.querySelector('nav.rector-toc')), ['Updated independently'],
+    'the second TOC updates independently')
+  equal(labels(editorNode.querySelector('nav.rector-toc')), ['Replacement', 'Subheading'],
+    'changes to another editor do not affect the original TOC')
+  styledEditor.destroy()
+  assert(tocStyles().length === 0, 'final editor release removes its TOC CSS link')
+  styledSource.destroy()
+  styleHolder.remove()
+
   editor.destroy()
   equal(source.getHeadings().map(item => item.text), ['Replacement', 'Subheading'],
     'editor destroy unbinds without dropping the last source snapshot')
@@ -189,6 +236,9 @@ try {
   try { source?.destroy() } catch {}
   try { renderer?.destroy() } catch {}
   try { renderedSource?.destroy() } catch {}
+  try { styledEditor?.destroy() } catch {}
+  try { styledSource?.destroy() } catch {}
+  try { styleHolder?.remove() } catch {}
 }
 </script>
 </body>
