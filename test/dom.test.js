@@ -152,3 +152,15 @@ test('navigation inside editor scrolls only its own target and cleans click hand
   assert.equal(instance.element.events.get('click').size, 0)
   source.destroy()
 })
+
+test('a rejected output render must not publish headings from the failed document', () => {
+  const source = createTocSource({ document: documentData })
+  const invalid = { version: '2.0.0', blocks: [
+    { id: 'invalid', type: 'heading', dataVersion: 99, data: { text: 'Rejected heading', level: 2 } },
+  ] }
+  assert.throws(() => renderTocDocument({
+    renderTo() { throw new Error('invalid document') },
+  }, invalid, document.createElement('div'), { source }), /invalid document/)
+  assert.deepEqual(source.getHeadings().map(item => item.text), ['Start', 'Child'])
+  source.destroy()
+})

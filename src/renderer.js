@@ -43,7 +43,9 @@ export function renderTocDocument(renderer, documentData, container, { source, a
   if (!source || typeof source.setDocument !== 'function') {
     throw new TypeError('renderTocDocument requires a writable TOC source')
   }
-  source.setDocument(documentData)
+  // Publish derived headings only after Rector accepts the document.
+  // An invalid render must not overwrite the live TOC for the last valid output.
   renderer.renderTo(documentData, container)
+  source.setDocument(documentData)
   applyTocAnchors(container, { anchorPrefix })
 }

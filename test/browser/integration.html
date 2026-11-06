@@ -93,6 +93,19 @@ try {
     'published heading receives fragment anchor')
   assert(outputToc.querySelector('a').getAttribute('href') === '#' + tocAnchorId('new'),
     'published href addresses real anchor')
+  // Rector rejects an invalid block version without altering mounted output.
+  // The TOC must retain headings from that previously accepted document.
+  let rejected = false
+  try {
+    renderTocDocument(renderer, documentData(
+      heading('poison', 'Poisoned heading'),
+      { id: 'invalid', type: 'heading', dataVersion: 99, data: { text: 'Invalid', level: 2 } },
+      tocBlock,
+    ), articleNode, { source: renderedSource })
+  } catch { rejected = true }
+  assert(rejected, 'malformed document is rejected')
+  equal(labels(articleNode.querySelector('nav.rector-toc')), ['Replacement', 'Subheading'],
+    'rejected render retains last accepted TOC')
   renderTocDocument(renderer, documentData(heading('last', 'Last title'), tocBlock), articleNode,
     { source: renderedSource })
   equal(labels(articleNode.querySelector('nav.rector-toc')), ['Last title'],
