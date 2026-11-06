@@ -106,6 +106,8 @@ test('settings panel commits schema-compatible single transactions', () => {
   maxLevel.value = '3'; maxLevel.emit('change', {})
   numbered.checked = true; numbered.emit('change', {})
   assert.deepEqual(current, { title: 'Navigation', minLevel: 3, maxLevel: 3, numbered: true })
+  assert.equal(minLevel.value, '3', 'panel must reflect auto-adjusted minimum')
+  assert.equal(maxLevel.value, '3', 'panel must reflect canonical maximum')
   source.destroy()
 })
 

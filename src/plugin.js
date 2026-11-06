@@ -9,19 +9,35 @@ function settingsPanel(context) {
   const panel = doc.createElement('div')
   panel.className = 'rector-toc__settings'
   const value = context.getData()
-  const addField = (name, input, onChange) => {
+  const controls = new Map()
+  const syncControls = () => {
+    const canonical = context.getData()
+    for (const [field, input] of controls) {
+      if (field === 'numbered') input.checked = canonical.numbered
+      else input.value = String(canonical[field])
+    }
+  }
+  const addField = (name, field, input, onChange) => {
     const label = doc.createElement('label')
     label.className = 'rector-toc__setting'
     const span = doc.createElement('span')
     span.textContent = name
     label.append(span, input)
     panel.appendChild(label)
-    input.addEventListener('change', () => context.updateData(current => onChange(current, input)))
+    controls.set(field, input)
+    input.addEventListener('change', () => {
+      try { context.updateData(current => onChange(current, input)) }
+      finally {
+        // Settings panels are not remounted after model-first updates. A min/max
+        // adjustment can change the other input; reconcile all live controls.
+        try { syncControls() } catch { /* The panel may have been retired. */ }
+      }
+    })
   }
   const title = doc.createElement('input')
   title.type = 'text'
   title.value = value.title
-  addField('Title', title, (current, input) => ({ ...current, title: input.value }))
+  addField('Title', 'title', title, (current, input) => ({ ...current, title: input.value }))
 
   for (const [property, label] of [['minLevel', 'First heading level'], ['maxLevel', 'Last heading level']]) {
     const select = doc.createElement('select')
@@ -32,7 +48,7 @@ function settingsPanel(context) {
       select.appendChild(option)
     }
     select.value = String(value[property])
-    addField(label, select, (current, input) => {
+    addField(label, property, select, (current, input) => {
       const level = Number(input.value)
       return property === 'minLevel'
         ? { ...current, minLevel: level, maxLevel: Math.max(level, current.maxLevel) }
@@ -42,7 +58,7 @@ function settingsPanel(context) {
   const numbered = doc.createElement('input')
   numbered.type = 'checkbox'
   numbered.checked = value.numbered
-  addField('Numbered list', numbered, (current, input) => ({ ...current, numbered: input.checked }))
+  addField('Numbered list', 'numbered', numbered, (current, input) => ({ ...current, numbered: input.checked }))
   return panel
 }
 
