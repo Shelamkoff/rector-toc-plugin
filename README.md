@@ -9,6 +9,7 @@ Automatic, nested and live-updating Table of Contents for [Rector v2](https://gi
 - Configurable title, heading range and numbered/bulleted mode, stored as versioned JSON.
 - Anchors use stable block IDs rather than title-derived slugs, so renaming headings preserves links.
 - Safe plain-text labels (no untrusted HTML injection), optional inline-widget text resolver.
+- Complete HTML5 entity decoding (using the pinned `entities` dependency); literal escaped inline tokens remain literal.
 - Per-editor source lifecycle, cancellable subscriptions, custom navigation and separate renderer.
 
 ## Install
@@ -99,9 +100,14 @@ If a custom source or navigation callback executes network operations, the appli
 
 ## Development
 
+Install the pinned HTML5 decoder before running tests in a source checkout. The
+Rector v2 peer dependency is provided separately by the host application.
+
 ~~~sh
+npm install --no-audit --no-fund --legacy-peer-deps
 npm test
 npm pack --dry-run
 ~~~
+
 
 Tests cover schema/version handling, heading extraction and entity escaping, nesting, stable anchors, source subscriptions/event filtering, block/renderer lifecycle and settings. See `test/`.
