@@ -12,6 +12,9 @@ function findHeadingInScope(nav, id) {
 export function createTocView(document, { anchorPrefix, navigate } = {}) {
   const nav = document.createElement('nav')
   nav.className = 'rector-toc'
+  // A block can be focused programmatically without adding a redundant Tab stop;
+  // its links remain in the regular keyboard navigation order.
+  nav.tabIndex = -1
   nav.contentEditable = 'false'
   const handleClick = event => {
     const target = event.target?.closest?.('a[data-toc-target]')
