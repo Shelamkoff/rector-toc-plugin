@@ -74,6 +74,10 @@ try {
     'TOC block navigation can receive programmatic keyboard focus')
   assert(toc.querySelector('ol') === null && toc.querySelector('ul') !== null, 'default bullets')
   equal(toc.querySelector('a').getAttribute('href'), '#' + tocAnchorId('intro'), 'stable anchor URL')
+  const urlBeforeEditorNavigation = location.href
+  toc.querySelector('a[data-toc-target="intro"]').click()
+  assert(location.href === urlBeforeEditorNavigation,
+    'editor TOC navigation scrolls its own heading without modifying the document URL')
   const focusedLink = toc.querySelector('a[data-toc-target="intro"]')
   focusedLink.focus()
   assert(document.activeElement === focusedLink, 'TOC link accepts keyboard focus')
@@ -143,6 +147,9 @@ try {
     'published heading receives fragment anchor')
   assert(outputToc.querySelector('a').getAttribute('href') === '#' + tocAnchorId('new'),
     'published href addresses real anchor')
+  outputToc.querySelector('a[data-toc-target="new"]').click()
+  equal(location.hash, '#' + tocAnchorId('new'),
+    'published TOC links navigate to the actual heading fragment')
   // Rector rejects an invalid block version without altering mounted output.
   // The TOC must retain headings from that previously accepted document.
   let rejected = false
