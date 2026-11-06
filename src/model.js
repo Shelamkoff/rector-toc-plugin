@@ -1,3 +1,5 @@
+import { decodeHTML } from 'entities'
+
 export const TOC_TYPE = 'toc'
 export const DEFAULT_TOC_DATA = Object.freeze({
   title: 'Table of contents',
@@ -44,23 +46,6 @@ export const tocSchema = Object.freeze({
   encode(data) { return { dataVersion: 1, data: normalizeTocData(data) } },
 })
 
-const ENTITIES = Object.freeze({
-  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
-  ndash: '–', mdash: '—', hellip: '…', laquo: '«', raquo: '»',
-  lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”', copy: '©', reg: '®',
-})
-
-function decodeEntities(text) {
-  return text.replace(/&(#(?:[xX][0-9a-fA-F]+|[0-9]+)|[a-zA-Z]+);/g, (match, entity) => {
-    if (entity[0] !== '#') return ENTITIES[entity] ?? match
-    const hex = entity[1]?.toLowerCase() === 'x'
-    const point = Number.parseInt(entity.slice(hex ? 2 : 1), hex ? 16 : 10)
-    if (!Number.isFinite(point) || point === 0 || point > 0x10ffff
-      || (point >= 0xd800 && point <= 0xdfff)) return '\ufffd'
-    return String.fromCodePoint(point)
-  })
-}
-
 /** Plain-text extraction without inserting author HTML into a live DOM. */
 function richTextToText(html, resolveInlineToken) {
   if (typeof html !== 'string') throw new TypeError('Heading text must be a string')
@@ -77,14 +62,14 @@ function richTextToText(html, resolveInlineToken) {
       const tokens = /\{\{([^{}\s]+)\}\}/g
       let consumed = 0
       for (const match of rawText.matchAll(tokens)) {
-        result += decodeEntities(rawText.slice(consumed, match.index))
+        result += decodeHTML(rawText.slice(consumed, match.index))
         const replacement = resolveInlineToken(match[1], match[0])
         result += typeof replacement === 'string' ? replacement : match[0]
         consumed = match.index + match[0].length
       }
-      result += decodeEntities(rawText.slice(consumed))
+      result += decodeHTML(rawText.slice(consumed))
     } else {
-      result += decodeEntities(rawText)
+      result += decodeHTML(rawText)
     }
     rawText = ''
   }

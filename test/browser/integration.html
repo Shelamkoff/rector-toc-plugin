@@ -10,7 +10,7 @@ import { createHeadingPlugin } from '../../rector/plugins/heading/index.js'
 import { EditorRenderer } from '../../rector/renderer/index.js'
 import {
   createTocPlugin, createTocSource, createTocRenderer,
-  renderTocDocument, tocAnchorId,
+  renderTocDocument, tocAnchorId, htmlToText,
 } from '../../src/index.js'
 
 const results = []
@@ -56,6 +56,8 @@ try {
   const toc = editorNode.querySelector('nav.rector-toc')
   assert(toc !== null, 'TOC plugin mounts in actual Rector')
   equal(labels(toc), ['Introduction', 'Details'], 'initial heading extraction')
+  equal(htmlToText('&eacute; &notin; &frac12; &#x80;'), 'é ∉ ½ €',
+    'full HTML5 entities decode in Chromium runtime')
   toc.focus()
   assert(document.activeElement === toc,
     'TOC block navigation can receive programmatic keyboard focus')
