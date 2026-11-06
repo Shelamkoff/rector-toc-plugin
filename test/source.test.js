@@ -274,3 +274,25 @@ test('accepting a newer document with unchanged headings invalidates old prepare
   assert.deepEqual(notifications, [])
   source.destroy()
 })
+
+
+test('independent subscriptions using the same callback have independent lifetimes', () => {
+  const source = createTocSource()
+  const received = []
+  const callback = headings => received.push(headings[0]?.text)
+  const offFirst = source.subscribe(callback)
+  const offSecond = source.subscribe(callback)
+
+  source.setDocument(doc(heading('first', 'First')))
+  assert.deepEqual(received, ['First', 'First'],
+    'each live subscription must receive its own notification')
+  offFirst()
+  source.setDocument(doc(heading('first', 'Second')))
+  assert.deepEqual(received, ['First', 'First', 'Second'],
+    'unsubscribing one registration must preserve the other')
+
+  offSecond()
+  source.setDocument(doc(heading('first', 'Third')))
+  assert.deepEqual(received, ['First', 'First', 'Second'])
+  source.destroy()
+})
