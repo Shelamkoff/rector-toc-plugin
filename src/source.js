@@ -33,6 +33,7 @@ export function createTocSource(options = {}) {
   }
 
   let headings = collectTocHeadings(options.document ?? EMPTY_DOCUMENT, extraction)
+  let revision = 0
   let destroyed = false
   let binding = null
   let delivering = false
@@ -54,17 +55,21 @@ export function createTocSource(options = {}) {
   const prepareDocument = documentData => {
     assertLive()
     const next = collectTocHeadings(documentData, extraction)
+    const expectedRevision = revision
     let used = false
     return () => {
       assertLive()
       if (used) return
       used = true
-      publishHeadings(next)
+      // An accepted, newer document supersedes a delayed prepared projection.
+      // Rector remains the single source of truth for the actual document.
+      if (revision === expectedRevision) publishHeadings(next)
     }
   }
   const publishHeadings = next => {
     assertLive()
     if (sameHeadings(headings, next)) return
+    revision++
     headings = next
     if (delivering) { superseded = true; return }
     delivering = true
