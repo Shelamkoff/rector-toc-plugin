@@ -113,3 +113,11 @@ test('TOC data normalization ignores inherited settings and reads only authored 
     title: 'Table of contents', minLevel: 2, maxLevel: 6, numbered: false,
   })
 })
+
+test('unterminated repeated HTML comments never rescan the remaining heading text', () => {
+  const malformed = '<!-- '.repeat(24000)
+  const started = performance.now()
+  assert.equal(htmlToText(malformed), malformed.trim())
+  const elapsedMs = performance.now() - started
+  assert.ok(elapsedMs < 1000, 'malformed comment processing must remain linear')
+})
