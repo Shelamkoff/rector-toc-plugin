@@ -121,3 +121,11 @@ test('unterminated repeated HTML comments never rescan the remaining heading tex
   const elapsedMs = performance.now() - started
   assert.ok(elapsedMs < 1000, 'malformed comment processing must remain linear')
 })
+
+test('decode full HTML5 named and legacy numeric entities exactly once in heading text', () => {
+  assert.equal(htmlToText('&eacute; &notin; &frac12; &CounterClockwiseContourIntegral;'),
+    'é ∉ ½ ∳')
+  assert.equal(htmlToText('Euro &#x80; and invalid &#0;'), 'Euro € and invalid �')
+  assert.equal(htmlToText('&amp;copy; &unknown;'), '&copy; &unknown;')
+  assert.equal(htmlToText('Break&nbsp;space &eacute;'), 'Break space é')
+})
