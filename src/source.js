@@ -79,13 +79,13 @@ export function createTocSource(options = {}) {
       do {
         superseded = false
         const snapshot = headings
-        for (const callback of [...subscribers]) {
+        for (const subscription of [...subscribers]) {
           if (destroyed) break
           // A reentrant update supersedes this notification; restart with
           // the current snapshot rather than send duplicate/stale values.
           if (headings !== snapshot) { superseded = true; break }
-          if (!subscribers.has(callback)) continue
-          try { callback(snapshot) } catch (error) { report(error) }
+          if (!subscribers.has(subscription)) continue
+          try { subscription.callback(snapshot) } catch (error) { report(error) }
         }
       } while (superseded && !destroyed)
     } finally {
@@ -181,9 +181,12 @@ export function createTocSource(options = {}) {
     subscribe(callback) {
       assertLive()
       if (typeof callback !== 'function') throw new TypeError('TOC listener must be a function')
-      subscribers.add(callback)
+      // Subscription identity belongs to each registration, not to the
+      // callback function: two owners may intentionally share one callback.
+      const subscription = { callback }
+      subscribers.add(subscription)
       let active = true
-      return () => { if (active) { active = false; subscribers.delete(callback) } }
+      return () => { if (active) { active = false; subscribers.delete(subscription) } }
     },
     destroy() {
       if (destroyed) return
