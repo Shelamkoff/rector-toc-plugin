@@ -1,0 +1,31 @@
+{
+  "name": "@shelamkoff/rector-toc-plugin",
+  "version": "0.1.0",
+  "description": "Automatic, live table of contents block for Rector v2",
+  "type": "module",
+  "license": "MIT",
+  "sideEffects": ["**/*.css"],
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    },
+    "./styles.css": "./src/toc.css"
+  },
+  "files": ["src", "README.md", "LICENSE"],
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "typecheck": "tsc -p tsconfig.json",
+    "check": "npm test && npm pack --dry-run"
+  },
+  "peerDependencies": {
+    "@shelamkoff/rector": "^2.0.0"
+  },
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Shelamkoff/rector-toc-plugin.git"
+  }
+}

@@ -1,0 +1,29 @@
+.rector-toc {
+  color: inherit;
+  border: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+  border-radius: 0.65rem;
+  padding: 1rem 1.2rem;
+  font: inherit;
+  min-width: 0;
+}
+.rector-toc__title {
+  font-weight: 650;
+  font-size: 1.05em;
+  margin: 0 0 0.65rem;
+}
+.rector-toc__list {
+  padding-inline-start: 1.3rem;
+  margin: 0;
+}
+.rector-toc__list .rector-toc__list { margin-block: 0.25rem; }
+.rector-toc__item { line-height: 1.5; margin-block: 0.18rem; }
+.rector-toc__link { color: inherit; text-decoration: none; overflow-wrap: anywhere; }
+.rector-toc__link:hover { text-decoration: underline; text-underline-offset: 0.15em; }
+.rector-toc__link:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; border-radius: 2px; }
+.rector-toc__empty { opacity: 0.65; margin: 0; }
+.rector-toc__settings { display: grid; gap: 0.65rem; min-width: 200px; padding: 0.5rem; }
+.rector-toc__setting { display: grid; gap: 0.25rem; font-size: 0.9em; }
+.rector-toc__setting input:not([type='checkbox']),
+.rector-toc__setting select { font: inherit; width: 100%; }
+.rector-toc__setting input[type='checkbox'] { justify-self: start; }
+@media (prefers-reduced-motion: reduce) { .rector-toc__link { scroll-behavior: auto; } }
