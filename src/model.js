@@ -58,18 +58,42 @@ function decodeEntities(text) {
   })
 }
 
-/** Extract plain text without parsing author HTML into live DOM or Trusted Types sinks. */
-export function htmlToText(html) {
+/** Plain-text extraction without inserting author HTML into a live DOM. */
+function richTextToText(html, resolveInlineToken) {
   if (typeof html !== 'string') throw new TypeError('Heading text must be a string')
+
   let result = ''
+  let rawText = ''
+  const flushText = () => {
+    if (!rawText) return
+    if (resolveInlineToken) {
+      // Resolve only raw tokens present in a single HTML text segment.
+      // Decoding entities first would turn literal &#123;&#123;id&#125;&#125;
+      // into a widget reference that the editor never authored.
+      const tokens = /\{\{([^{}\s]+)\}\}/g
+      let consumed = 0
+      for (const match of rawText.matchAll(tokens)) {
+        result += decodeEntities(rawText.slice(consumed, match.index))
+        const replacement = resolveInlineToken(match[1], match[0])
+        result += typeof replacement === 'string' ? replacement : match[0]
+        consumed = match.index + match[0].length
+      }
+      result += decodeEntities(rawText.slice(consumed))
+    } else {
+      result += decodeEntities(rawText)
+    }
+    rawText = ''
+  }
+
   for (let i = 0; i < html.length;) {
     if (html[i] !== '<' || !/[/!a-zA-Z]/.test(html[i + 1] ?? '')) {
-      result += html[i++]
+      rawText += html[i++]
       continue
     }
     if (html.startsWith('<!--', i)) {
       const end = html.indexOf('-->', i + 4)
-      if (end === -1) { result += '<'; i++; continue }
+      if (end === -1) { rawText += html[i++]; continue }
+      flushText()
       i = end + 3
       continue
     }
@@ -81,14 +105,19 @@ export function htmlToText(html) {
       if (char === '"' || char === "'") quote = char
       else if (char === '>') break
     }
-    // No terminating tag: the remaining input is literal text. Do not rescan
-    // its suffix at every subsequent '<' (quadratic on malformed HTML).
-    if (j === html.length) { result += html.slice(i); break }
+    if (j === html.length) { rawText += html.slice(i); break }
+    flushText()
     const tag = html.slice(i + 1, j).trim().toLowerCase()
     if (/^\/?(?:br|p|div|li)(?:\s|\/|$)/.test(tag)) result += ' '
     i = j + 1
   }
-  return decodeEntities(result).replace(/\s+/g, ' ').trim()
+  flushText()
+  return result.replace(/\s+/g, ' ').trim()
+}
+
+/** Extract heading text without parsing author HTML into live DOM. */
+export function htmlToText(html) {
+  return richTextToText(html)
 }
 
 /** Pure document-to-headings projection; does not read DOM or make requests. */
@@ -103,15 +132,15 @@ export function collectTocHeadings(documentData, { inlineToText, textFromBlock }
     if (!Number.isInteger(level) || level < 2 || level > 6
       || typeof block.id !== 'string' || !block.id
       || typeof block.data?.text !== 'string') continue
-    let text = textFromBlock ? textFromBlock(block) : htmlToText(block.data.text)
+    const resolveInlineToken = inlineToText && !textFromBlock
+      ? (id, token) => Object.hasOwn(block.inline ?? {}, id)
+        ? inlineToText(block.inline[id], block) ?? token
+        : token
+      : undefined
+    let text = textFromBlock
+      ? textFromBlock(block)
+      : richTextToText(block.data.text, resolveInlineToken)
     if (typeof text !== 'string') throw new TypeError('textFromBlock must return a string')
-    if (inlineToText && !textFromBlock) {
-      text = text.replace(/\{\{([^{}\s]+)\}\}/g, (token, id) => {
-        if (!Object.hasOwn(block.inline ?? {}, id)) return token
-        const replacement = inlineToText(block.inline[id], block)
-        return typeof replacement === 'string' ? replacement : token
-      })
-    }
     text = text.replace(/\s+/g, ' ').trim()
     if (text) headings.push(Object.freeze({ id: block.id, level, text }))
   }
