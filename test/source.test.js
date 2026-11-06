@@ -156,3 +156,19 @@ test('destroy prevents a callback from rebinding a source while unsubscribing', 
   assert.equal(other.listeners('transaction:committed'), 0)
   assert.deepEqual(warnings, ['TOC source is destroyed'])
 })
+
+
+test('reentrant updates notify remaining subscribers once with the latest heading snapshot', () => {
+  const source = createTocSource()
+  const seen = []
+  source.subscribe(headings => {
+    if (headings[0]?.text === 'Initial') {
+      source.setDocument(doc(heading('a', 'Latest')))
+    }
+  })
+  source.subscribe(headings => seen.push(headings.map(h => h.text).join(',')))
+  source.setDocument(doc(heading('a', 'Initial')))
+  assert.deepEqual(seen, ['Latest'])
+  assert.deepEqual(source.getHeadings().map(h => h.text), ['Latest'])
+  source.destroy()
+})
