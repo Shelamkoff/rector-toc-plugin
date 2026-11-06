@@ -41,6 +41,8 @@ export declare function tocAnchorId(blockId: string, prefix?: string): string
 export interface TocSource {
   getHeadings(): readonly TocHeading[]
   setDocument(documentData: EditorOutputData): void
+  /** Validate the derived heading snapshot without publishing it; returns a one-shot commit. */
+  prepareDocument(documentData: EditorOutputData): () => void
   bindEditor(editor: IEditor): () => void
   subscribe(callback: (headings: readonly TocHeading[]) => void): () => void
   destroy(): void
@@ -63,5 +65,5 @@ export declare function renderTocDocument(
   renderer: { renderTo(data: EditorOutputData, container: HTMLElement): void },
   documentData: EditorOutputData,
   container: HTMLElement,
-  options: { source: Pick<TocSource, 'setDocument'>, anchorPrefix?: string },
+  options: { source: Pick<TocSource, 'setDocument'> & Partial<Pick<TocSource, 'prepareDocument'>>, anchorPrefix?: string },
 ): void

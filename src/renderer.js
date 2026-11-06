@@ -43,9 +43,14 @@ export function renderTocDocument(renderer, documentData, container, { source, a
   if (!source || typeof source.setDocument !== 'function') {
     throw new TypeError('renderTocDocument requires a writable TOC source')
   }
-  // Publish derived headings only after Rector accepts the document.
-  // An invalid render must not overwrite the live TOC for the last valid output.
+  // The source can precompute its fallible read-only projection before the
+  // renderer changes any DOM. Only publish after Rector accepts the document.
+  const commit = source.prepareDocument?.(documentData)
+  if (commit !== undefined && typeof commit !== 'function') {
+    throw new TypeError('TOC source prepareDocument must return a commit function')
+  }
   renderer.renderTo(documentData, container)
-  source.setDocument(documentData)
+  if (commit) commit()
+  else source.setDocument(documentData)
   applyTocAnchors(container, { anchorPrefix })
 }

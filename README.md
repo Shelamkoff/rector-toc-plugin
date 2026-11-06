@@ -79,7 +79,7 @@ renderer.destroy()
 source.destroy()
 ~~~
 
-`renderTocDocument()` calls `source.setDocument()`, renders the current v2 document and assigns stable IDs to rendered heading elements. If you use `renderer.render()` or `renderer.renderTo()` directly, call `applyTocAnchors(container)` afterward. For multiple documents in one page supply a distinct ASCII `anchorPrefix` to the TOC plugin/renderer and anchor function. The renderer is browser-DOM based; a server-side HTML renderer should use `collectTocHeadings()` and `tocAnchorId()` to produce the same markup. No server-side DOM or API credentials are required by this package.
+`renderTocDocument()` prepares and validates the source projection before updating DOM, then commits the new heading snapshot after the renderer accepts the current v2 document and assigns stable IDs to rendered heading elements. If you use `renderer.render()` or `renderer.renderTo()` directly, call `applyTocAnchors(container)` afterward. For multiple documents in one page supply a distinct ASCII `anchorPrefix` to the TOC plugin/renderer and anchor function. The renderer is browser-DOM based; a server-side HTML renderer should use `collectTocHeadings()` and `tocAnchorId()` to produce the same markup. No server-side DOM or API credentials are required by this package.
 
 ## Canonical JSON
 
@@ -101,7 +101,7 @@ Entries are *derived* from `heading` blocks. Only appearance options are persist
 
 ## Runtime/source contract
 
-`createTocSource({ document?, inlinePlugins?, inlineToText?, textFromBlock?, onError? })` exposes `getHeadings()`, `setDocument(data)`, `subscribe(listener)`, `bindEditor(editor)` and `destroy()`. `bindEditor()` uses only `save()` and `transaction:committed`/`editor:destroyed`, so the TOC follows all canonical document mutations. It reads only when a relevant heading or document-order change was committed and isolates observer exceptions. For custom heading types, use your own source implementing `getHeadings()` / `subscribe()`.
+`createTocSource({ document?, inlinePlugins?, inlineToText?, textFromBlock?, onError? })` exposes `getHeadings()`, `setDocument(data)`, `prepareDocument(data)`, `subscribe(listener)`, `bindEditor(editor)` and `destroy()`. `prepareDocument(data)` creates a one-use commit that can be invoked after a renderer has successfully mounted the document; it never publishes partial results when an extractor fails. `bindEditor()` uses only `save()` and `transaction:committed`/`editor:destroyed`, so the TOC follows all canonical document mutations. It reads only when a relevant heading or document-order change was committed and isolates observer exceptions. For custom heading types, use your own source implementing `getHeadings()` / `subscribe()`.
 
 If a custom source or navigation callback executes network operations, the application owns authorization, request cancellation and error handling. This plugin never fetches URLs, writes user-supplied HTML or creates new document transactions for heading updates.
 

@@ -47,9 +47,23 @@ export function createTocSource(options = {}) {
       if (result && typeof result.then === 'function') Promise.resolve(result).catch(() => {})
     } catch {}
   }
-  const setDocument = documentData => {
+  // A prepared projection can be validated before an external DOM renderer
+  // mutates its output. Committing a prepared result never re-runs consumers'
+  // possibly fallible canonical text extractors.
+  const setDocument = documentData => publishHeadings(collectTocHeadings(documentData, extraction))
+  const prepareDocument = documentData => {
     assertLive()
     const next = collectTocHeadings(documentData, extraction)
+    let used = false
+    return () => {
+      assertLive()
+      if (used) return
+      used = true
+      publishHeadings(next)
+    }
+  }
+  const publishHeadings = next => {
+    assertLive()
     if (sameHeadings(headings, next)) return
     headings = next
     if (delivering) { superseded = true; return }
@@ -133,6 +147,7 @@ export function createTocSource(options = {}) {
   return Object.freeze({
     getHeadings() { assertLive(); return headings },
     setDocument,
+    prepareDocument,
     bindEditor,
     subscribe(callback) {
       assertLive()
