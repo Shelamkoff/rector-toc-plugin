@@ -93,21 +93,16 @@ export function createTocPlugin(options = {}) {
         create(initial, blockContext) {
           if (destroyed) throw new Error('TOC runtime is destroyed')
           const view = createTocView(blockContext.ownerDocument, { anchorPrefix, navigate })
+          try {
           let data = tocSchema.encode(initial).data
           let instanceDestroyed = false
           const updateView = headings => {
             if (!instanceDestroyed && !blockContext.signal.aborted) view.render(data, headings)
           }
           updateView(source.getHeadings())
-          let unsubscribe
-          try {
-            unsubscribe = source.subscribe(updateView)
-            if (typeof unsubscribe !== 'function') {
-              throw new TypeError('TOC source.subscribe must return an unsubscribe function')
-            }
-          } catch (error) {
-            view.destroy()
-            throw error
+          const unsubscribe = source.subscribe(updateView)
+          if (typeof unsubscribe !== 'function') {
+            throw new TypeError('TOC source.subscribe must return an unsubscribe function')
           }
           let subscriptionReleased = false
           const releaseSubscription = () => {
@@ -133,6 +128,12 @@ export function createTocPlugin(options = {}) {
               try { releaseSubscription() }
               finally { view.destroy() }
             },
+          }
+          } catch (error) {
+            // Rector has not accepted this block instance. It cannot own the
+            // provisional navigation, so retire listeners on every failure.
+            view.destroy()
+            throw error
           }
         },
         destroy() { destroyed = true },
