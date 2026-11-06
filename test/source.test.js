@@ -190,3 +190,45 @@ test('binding observes a heading edit triggered by initial TOC subscribers', () 
   unbind()
   source.destroy()
 })
+
+
+test('single heading edits use committed block changes without saving the entire document', () => {
+  const originalHeading = heading('h', 'Before')
+  const editor = createMockEditor(doc(
+    ...Array.from({ length: 500 }, (_, index) =>
+      ({ id: 'p' + index, type: 'paragraph', data: { text: 'Body ' + index } })),
+    originalHeading,
+  ))
+  const source = createTocSource()
+  const unbind = source.bindEditor(editor)
+  assert.equal(editor.saves, 1)
+  const changedHeading = heading('h', 'After')
+  editor.setDocument(doc(changedHeading))
+  editor.emit('transaction:committed', {
+    changes: [{
+      kind: 'block.update',
+      id: 'h',
+      before: originalHeading,
+      after: changedHeading,
+    }],
+  })
+  assert.deepEqual(source.getHeadings().map(item => item.text), ['After'])
+  assert.equal(editor.saves, 1, 'a single block update must not clone all editor blocks again')
+  unbind()
+  source.destroy()
+})
+
+test('prepared TOC projections publish only after commit and do not repeat notifications', () => {
+  const source = createTocSource({ document: doc(heading('h', 'Old')) })
+  const seen = []
+  source.subscribe(snapshot => seen.push(snapshot[0]?.text))
+  const publish = source.prepareDocument(doc(heading('h', 'New')))
+  assert.deepEqual(source.getHeadings().map(item => item.text), ['Old'])
+  assert.deepEqual(seen, [])
+  publish()
+  publish()
+  assert.deepEqual(source.getHeadings().map(item => item.text), ['New'])
+  assert.deepEqual(seen, ['New'])
+  source.destroy()
+  assert.throws(() => source.prepareDocument(doc(heading('h', 'Post-destroy'))), /destroyed/)
+})
