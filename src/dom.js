@@ -37,6 +37,11 @@ export function createTocView(document, { anchorPrefix, navigate } = {}) {
 
   const render = (data, headings) => {
     const config = normalizeTocData(data)
+    const active = document.activeElement
+    const focusedId = active && nav.contains(active)
+      ? active.closest?.('a[data-toc-target]')?.dataset.tocTarget
+      : null
+    let nextFocusedLink = null
     nav.replaceChildren()
     nav.setAttribute('aria-label', config.title || 'Table of contents')
     if (config.title) {
@@ -51,6 +56,7 @@ export function createTocView(document, { anchorPrefix, navigate } = {}) {
       empty.className = 'rector-toc__empty'
       empty.textContent = 'No headings'
       nav.appendChild(empty)
+      if (focusedId) nav.focus({ preventScroll: true })
       return
     }
     const appendList = (parent, nodes) => {
@@ -65,6 +71,7 @@ export function createTocView(document, { anchorPrefix, navigate } = {}) {
         link.dataset.tocTarget = node.id
         link.setAttribute('href', '#' + tocAnchorId(node.id, anchorPrefix))
         link.textContent = node.text
+        if (node.id === focusedId) nextFocusedLink = link
         item.appendChild(link)
         if (node.children.length) appendList(item, node.children)
         list.appendChild(item)
@@ -72,6 +79,9 @@ export function createTocView(document, { anchorPrefix, navigate } = {}) {
       parent.appendChild(list)
     }
     appendList(nav, roots)
+    // Heading edits recreate the TOC DOM. Keep keyboard navigation on the
+    // same logical heading, or on the nav when that heading was removed.
+    if (focusedId) (nextFocusedLink ?? nav).focus({ preventScroll: true })
   }
 
   return { element: nav, render, destroy() { nav.removeEventListener('click', handleClick) } }
