@@ -8,7 +8,7 @@ Automatic, nested and live-updating Table of Contents for [Rector v2](https://gi
 - Live heading edits, inserts, moves, conversions, deletes and Undo/Redo; TOC updates are presentation-only (no extra history actions).
 - Configurable title, heading range and numbered/bulleted mode, stored as versioned JSON.
 - Anchors use stable block IDs rather than title-derived slugs, so renaming headings preserves links.
-- Safe plain-text labels (no untrusted HTML injection), optional inline-widget text resolver.
+- Canonical inline labels through registered definitions' toText contract, with no per-type branches or HTML injection.
 - Complete HTML5 entity decoding (using the pinned `entities` dependency); literal escaped inline tokens remain literal.
 - Per-editor source lifecycle, cancellable subscriptions, custom navigation and separate renderer.
 
@@ -26,29 +26,36 @@ npm install @shelamkoff/rector @shelamkoff/rector-toc-plugin
 import { createEditor } from '@shelamkoff/rector'
 import { createHeadingPlugin } from '@shelamkoff/rector/plugins/heading'
 import { createParagraphPlugin } from '@shelamkoff/rector/plugins/paragraph'
+import { createMentionPlugin } from '@shelamkoff/rector/inline-plugins/mention'
+import { createColorSwatchPlugin } from '@shelamkoff/rector/inline-plugins/color'
 import { createTocPlugin, createTocSource } from '@shelamkoff/rector-toc-plugin'
 
-// One TOC source for EACH editor. Create and bind it before inserting a TOC block.
-const source = createTocSource({
-  inlineToText(widget) {
-    if (widget.type === 'mention') return widget.data.name
-    if (widget.type === 'color') return widget.data.value
-    return null
-  },
-})
+// Use one inline definition list in both Rector and the TOC source.
+const inlinePlugins = [createMentionPlugin(), createColorSwatchPlugin()]
+const source = createTocSource({ inlinePlugins })
 const editor = createEditor({
   holder: document.querySelector('#editor'),
+  inlinePlugins,
   plugins: [createParagraphPlugin(), createHeadingPlugin(), createTocPlugin({ source })],
 })
-const unbind = source.bindEditor(editor)
+source.bindEditor(editor)
 
-// Calling these at app disposal is safe, even when the editor was already destroyed:
-function destroyEditor() {
-  unbind()
-  editor.destroy()
-  source.destroy()
-}
+// When the application disposes the editor:
+editor.destroy() // automatically releases the source binding and TOC instances
 ~~~
+
+Rector's public editor handle does not expose the registered inline definitions.
+Passing the same inlinePlugins array avoids an ever-growing type switch: each
+definition provides its own canonical toText(data), including Mention's trigger.
+The TOC uses the versioned schema to read that text without mounting widgets.
+Unknown types remain literal tokens. The optional inlineToText(widget, block)
+callback is supported as a fallback for custom integrations that do not expose
+toText.
+
+bindEditor(editor) returns a manual unbind function if early detachment is
+needed. Normal editor.destroy() already triggers automatic unbinding; the
+extra unbind() call shown in older examples was redundant. source.destroy()
+is optional when an independently retained source must also be disposed.
 
 Use Rector's block insertion menu or `editor.blocks.insert({ type: 'toc' })`. Its settings panel edits the title, minimum/maximum heading levels and list numbering. The default source doesn't see document content until you call `source.bindEditor(editor)`; this is intentional because the Rector block runtime exposes only per-block data. No access to private core classes is required.
 
@@ -94,7 +101,7 @@ Entries are *derived* from `heading` blocks. Only appearance options are persist
 
 ## Runtime/source contract
 
-`createTocSource({ document?, inlineToText?, textFromBlock?, onError? })` exposes `getHeadings()`, `setDocument(data)`, `subscribe(listener)`, `bindEditor(editor)` and `destroy()`. `bindEditor()` uses only `save()` and `transaction:committed`/`editor:destroyed`, so the TOC follows all canonical document mutations. It reads only when a relevant heading or document-order change was committed and isolates observer exceptions. For custom heading types, use your own source implementing `getHeadings()` / `subscribe()`.
+`createTocSource({ document?, inlinePlugins?, inlineToText?, textFromBlock?, onError? })` exposes `getHeadings()`, `setDocument(data)`, `subscribe(listener)`, `bindEditor(editor)` and `destroy()`. `bindEditor()` uses only `save()` and `transaction:committed`/`editor:destroyed`, so the TOC follows all canonical document mutations. It reads only when a relevant heading or document-order change was committed and isolates observer exceptions. For custom heading types, use your own source implementing `getHeadings()` / `subscribe()`.
 
 If a custom source or navigation callback executes network operations, the application owns authorization, request cancellation and error handling. This plugin never fetches URLs, writes user-supplied HTML or creates new document transactions for heading updates.
 

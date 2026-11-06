@@ -1,4 +1,5 @@
 import { decodeHTML } from 'entities'
+import { createInlineTextResolver } from './inlineDefinitions.js'
 
 export const TOC_TYPE = 'toc'
 export const DEFAULT_TOC_DATA = Object.freeze({
@@ -56,10 +57,12 @@ function richTextToText(html, resolveInlineToken) {
 
   let result = ''
   let rawText = ''
+  const spanStack = []
+  let literalSpanDepth = 0
   let commentTerminatorExhausted = false
   const flushText = () => {
     if (!rawText) return
-    if (resolveInlineToken) {
+    if (resolveInlineToken && literalSpanDepth === 0) {
       // Resolve only raw tokens present in a single HTML text segment.
       // Decoding entities first would turn literal &#123;&#123;id&#125;&#125;
       // into a widget reference that the editor never authored.
@@ -108,6 +111,18 @@ function richTextToText(html, resolveInlineToken) {
     if (j === html.length) { rawText += html.slice(i); break }
     flushText()
     const tag = html.slice(i + 1, j).trim().toLowerCase()
+    // Rector's oe-inline-literal span marks author-typed {{id}} text.
+    // The sidecar cannot turn marked literal text into a widget reference.
+    // Track nested spans; ordinary inline-formatting tags do not alter scope.
+    if (/^\/span(?:\s|$)/.test(tag)) {
+      if (spanStack.pop()) literalSpanDepth--
+    } else if (/^span(?:\s|\/|$)/.test(tag) && !/\/\s*$/.test(tag)) {
+      const classAttribute = /(?:^|\s)class\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/.exec(tag)
+      const literal = (classAttribute?.[1] ?? classAttribute?.[2] ?? classAttribute?.[3] ?? '')
+        .split(/\s+/).includes('oe-inline-literal')
+      spanStack.push(literal)
+      if (literal) literalSpanDepth++
+    }
     if (/^\/?(?:br|p|div|li)(?:\s|\/|$)/.test(tag)) result += ' '
     i = j + 1
   }
@@ -121,7 +136,8 @@ export function htmlToText(html) {
 }
 
 /** Pure document-to-headings projection; does not read DOM or make requests. */
-export function collectTocHeadings(documentData, { inlineToText, textFromBlock } = {}) {
+export function collectTocHeadings(documentData, { inlineToText, textFromBlock, inlinePlugins } = {}) {
+  const automaticToText = createInlineTextResolver(inlinePlugins)
   if (!isRecord(documentData) || !Array.isArray(documentData.blocks)) {
     throw new TypeError('TOC source requires a document with blocks')
   }
@@ -132,10 +148,12 @@ export function collectTocHeadings(documentData, { inlineToText, textFromBlock }
     if (!Number.isInteger(level) || level < 2 || level > 6
       || typeof block.id !== 'string' || !block.id
       || typeof block.data?.text !== 'string') continue
-    const resolveInlineToken = inlineToText && !textFromBlock
-      ? (id, token) => Object.hasOwn(block.inline ?? {}, id)
-        ? inlineToText(block.inline[id], block) ?? token
-        : token
+    const resolveInlineToken = (inlineToText || automaticToText) && !textFromBlock
+      ? (id, token) => {
+          if (!Object.hasOwn(block.inline ?? {}, id)) return token
+          const widget = block.inline[id]
+          return automaticToText?.(widget) ?? inlineToText?.(widget, block) ?? token
+        }
       : undefined
     let text = textFromBlock
       ? textFromBlock(block)

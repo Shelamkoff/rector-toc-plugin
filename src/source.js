@@ -1,4 +1,5 @@
 import { collectTocHeadings } from './model.js'
+import { createInlineTextResolver } from './inlineDefinitions.js'
 
 const EMPTY_DOCUMENT = Object.freeze({ version: '2.0.0', blocks: [] })
 
@@ -12,12 +13,17 @@ export function createTocSource(options = {}) {
   if (!options || typeof options !== 'object' || Array.isArray(options)) {
     throw new TypeError('TOC source options must be an object')
   }
-  const extraction = {
-    inlineToText: options.inlineToText,
-    textFromBlock: options.textFromBlock,
-  }
-  if (extraction.inlineToText !== undefined && typeof extraction.inlineToText !== 'function') {
+  if (options.inlineToText !== undefined && typeof options.inlineToText !== 'function') {
     throw new TypeError('inlineToText must be a function')
+  }
+  const automaticToText = createInlineTextResolver(options.inlinePlugins)
+  // Capture inline definitions once for a whole editor rather than rebuild
+  // a type switch/map every time a Heading is edited.
+  const extraction = {
+    inlineToText: automaticToText || options.inlineToText
+      ? (widget, block) => automaticToText?.(widget) ?? options.inlineToText?.(widget, block)
+      : undefined,
+    textFromBlock: options.textFromBlock,
   }
   if (extraction.textFromBlock !== undefined && typeof extraction.textFromBlock !== 'function') {
     throw new TypeError('textFromBlock must be a function')

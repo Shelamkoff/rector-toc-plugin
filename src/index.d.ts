@@ -1,6 +1,6 @@
 import type {
   BlockPluginDefinition, EditorOutputData, IEditor,
-  EditorBlockData,
+  EditorBlockData, InlinePluginDefinition,
 } from '@shelamkoff/rector/types'
 import type { BlockRendererDefinition } from '@shelamkoff/rector/renderer/types'
 
@@ -30,6 +30,8 @@ export declare function normalizeTocData(value: Partial<TocData>): TocData
 export declare function htmlToText(html: string): string
 export type TocBlock = EditorBlockData<'heading', { text: string, level: number }>
 export interface TocExtractionOptions {
+  /** Pass the same inline definitions used by Rector createEditor(). */
+  inlinePlugins?: readonly InlinePluginDefinition[]
   inlineToText?: (widget: unknown, block: TocBlock) => string | null | undefined
   textFromBlock?: (block: TocBlock) => string
 }
