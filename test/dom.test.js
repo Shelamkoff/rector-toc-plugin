@@ -206,3 +206,29 @@ test('block abort followed by destroy releases an external TOC subscription exac
   assert.equal(releases, 1, 'block destruction is idempotent after abort')
   runtime.destroy()
 })
+
+
+test('a failing TOC heading projection must not change the mounted renderer output', () => {
+  const documentBefore = {
+    version: '2.0.0',
+    blocks: [{ id: 'before', type: 'heading', dataVersion: 2, data: { text: 'Before', level: 2 } }],
+  }
+  const source = createTocSource({
+    document: documentBefore,
+    textFromBlock(block) {
+      if (block.id === 'bad') throw new Error('Cannot extract heading')
+      return block.data.text
+    },
+  })
+  const requested = {
+    version: '2.0.0',
+    blocks: [{ id: 'bad', type: 'heading', dataVersion: 2, data: { text: 'After', level: 2 } }],
+  }
+  let rendered = false
+  assert.throws(() => renderTocDocument({
+    renderTo() { rendered = true },
+  }, requested, document.createElement('div'), { source }), /Cannot extract heading/)
+  assert.equal(rendered, false, 'renderer must not mutate output after invalid TOC projection')
+  assert.deepEqual(source.getHeadings().map(entry => entry.text), ['Before'])
+  source.destroy()
+})
