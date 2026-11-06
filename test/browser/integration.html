@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="UTF-8"/><title>Rector TOC integration</title></head>
+<body data-status="running">
+<div id="editor"></div><div id="article"></div><pre id="result"></pre>
+<script type="module">
+import { createEditor } from '../../rector/index.js'
+import { createParagraphPlugin } from '../../rector/plugins/paragraph/index.js'
+import { createHeadingPlugin } from '../../rector/plugins/heading/index.js'
+import { EditorRenderer } from '../../rector/renderer/index.js'
+import {
+  createTocPlugin, createTocSource, createTocRenderer,
+  renderTocDocument, tocAnchorId,
+} from '../../src/index.js'
+
+const results = []
+const fail = (message) => { throw new Error(message) }
+function equal(actual, expected, label) {
+  const a = JSON.stringify(actual), b = JSON.stringify(expected)
+  if (a !== b) fail(label + ': expected ' + b + ', got ' + a)
+  results.push(label)
+}
+function assert(condition, label) {
+  if (!condition) fail(label)
+  results.push(label)
+}
+const heading = (id, text, level = 2) => ({
+  id, type: 'heading', dataVersion: 2, data: { text, level },
+})
+const tocBlock = {
+  id: 'toc-1', type: 'toc', dataVersion: 1,
+  data: { title: 'On this page', minLevel: 2, maxLevel: 6, numbered: false },
+}
+const documentData = (...blocks) => ({ version: '2.0.0', blocks })
+const labels = nav => [...nav.querySelectorAll('a[data-toc-target]')].map(x => x.textContent)
+const editorNode = document.querySelector('#editor')
+const articleNode = document.querySelector('#article')
+let editor, renderer, source, renderedSource, unbind
+
+try {
+  source = createTocSource()
+  editor = createEditor({
+    holder: editorNode,
+    plugins: [
+      createParagraphPlugin({ injectStyles: false }),
+      createHeadingPlugin({ injectStyles: false }),
+      createTocPlugin({ source, injectStyles: false }),
+    ],
+    injectStyles: false,
+    data: documentData(heading('intro', 'Introduction'), tocBlock, heading('child', 'Details', 3)),
+    blockInsertAnimationMs: 0,
+    blockMoveAnimationMs: 0,
+    blockRemoveAnimationMs: 0,
+  })
+  unbind = source.bindEditor(editor)
+  const toc = editorNode.querySelector('nav.rector-toc')
+  assert(toc !== null, 'TOC plugin mounts in actual Rector')
+  equal(labels(toc), ['Introduction', 'Details'], 'initial heading extraction')
+  assert(toc.querySelector('ol') === null && toc.querySelector('ul') !== null, 'default bullets')
+  equal(toc.querySelector('a').getAttribute('href'), '#' + tocAnchorId('intro'), 'stable anchor URL')
+  let committed = 0
+  editor.on('transaction:committed', () => committed++)
+  editor.blocks.update('intro', () => ({ data: { text: 'Changed &amp; more', level: 2 } }))
+  equal(labels(toc), ['Changed & more', 'Details'], 'model-first heading edit updates TOC')
+  equal(committed, 1, 'TOC update adds no author transaction')
+  assert(editor.undo(), 'undo works')
+  equal(labels(toc), ['Introduction', 'Details'], 'undo restores TOC labels')
+  assert(editor.redo(), 'redo works')
+  equal(labels(toc), ['Changed & more', 'Details'], 'redo restores TOC labels')
+  editor.blocks.move('child', 0)
+  equal(labels(toc), ['Details', 'Changed & more'], 'heading reorder updates TOC')
+  editor.blocks.remove('child')
+  equal(labels(toc), ['Changed & more'], 'heading deletion updates TOC')
+
+  editor.setReadOnly(true)
+  editor.blocks.update('intro', () => ({ data: { text: 'From host', level: 2 } }))
+  equal(labels(toc), ['From host'], 'authorized host update works in read-only mode')
+  editor.setReadOnly(false)
+
+  editor.render(documentData(heading('new', 'Replacement', 2), tocBlock, heading('nested', 'Subheading', 4)))
+  equal(labels(editorNode.querySelector('nav.rector-toc')), ['Replacement', 'Subheading'],
+    'whole-document replacement updates TOC')
+  assert(editor.save().blocks.some(block => block.type === 'toc'), 'TOC JSON survives save')
+
+  renderedSource = createTocSource()
+  renderer = new EditorRenderer({ injectStyles: false, blockTypes: ['heading'] })
+  renderer.registerRenderer(createTocRenderer({ source: renderedSource, injectStyles: false }))
+  const saved = editor.save()
+  renderTocDocument(renderer, saved, articleNode, { source: renderedSource })
+  const outputToc = articleNode.querySelector('nav.rector-toc')
+  equal(labels(outputToc), ['Replacement', 'Subheading'], 'renderer matches editor document')
+  equal(articleNode.querySelector('[data-block-id="new"]').id, tocAnchorId('new'),
+    'published heading receives fragment anchor')
+  assert(outputToc.querySelector('a').getAttribute('href') === '#' + tocAnchorId('new'),
+    'published href addresses real anchor')
+  renderTocDocument(renderer, documentData(heading('last', 'Last title'), tocBlock), articleNode,
+    { source: renderedSource })
+  equal(labels(articleNode.querySelector('nav.rector-toc')), ['Last title'],
+    'incremental renderTo updates existing TOC')
+
+  const mounted = articleNode.querySelector('nav.rector-toc')
+  renderer.destroy()
+  renderedSource.setDocument(documentData(heading('ignored', 'Ignored')))
+  equal(labels(mounted), ['Last title'], 'destroyed renderer unsubscribes from TOC')
+  editor.destroy()
+  equal(source.getHeadings().map(item => item.text), ['Replacement', 'Subheading'],
+    'editor destroy unbinds without dropping the last source snapshot')
+  document.body.dataset.status = 'pass'
+  document.querySelector('#result').textContent = JSON.stringify({ passed: results.length, results })
+} catch (error) {
+  document.body.dataset.status = 'fail'
+  document.querySelector('#result').textContent = String(error?.stack ?? error)
+  console.error(error)
+} finally {
+  try { unbind?.() } catch {}
+  try { editor?.destroy() } catch {}
+  try { source?.destroy() } catch {}
+  try { renderer?.destroy() } catch {}
+  try { renderedSource?.destroy() } catch {}
+}
+</script>
+</body>
+</html>

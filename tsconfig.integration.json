@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": false,
+    "baseUrl": ".",
+    "paths": {
+      "@shelamkoff/rector/types": ["./rector/core/publicTypes.d.ts"],
+      "@shelamkoff/rector/renderer/types": ["./rector/renderer/types.d.ts"]
+    }
+  },
+  "include": ["src/index.d.ts", "test/typecheck.ts"]
+}
