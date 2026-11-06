@@ -77,6 +77,28 @@ try {
   equal(labels(toc), ['From host'], 'authorized host update works in read-only mode')
   editor.setReadOnly(false)
 
+  // Exercise Rector's real block conversion and the resulting source update.
+  const paragraphId = editor.blocks.insert({ type: 'paragraph', data: { text: 'Converted paragraph' } })
+  assert(editor.blocks.get(paragraphId)?.type === 'paragraph', 'host paragraph insertion succeeds')
+  editor.blocks.convert(paragraphId, { type: 'heading', toolboxItemId: 'h2' })
+  assert(labels(toc).includes('Converted paragraph'),
+    'paragraph-to-heading conversion updates TOC')
+  assert(editor.undo(), 'conversion can be undone')
+  assert(!labels(toc).includes('Converted paragraph'), 'undo of conversion removes TOC entry')
+  assert(editor.redo(), 'conversion can be redone')
+  assert(labels(toc).includes('Converted paragraph'), 'redo of conversion restores TOC entry')
+
+  // A native editing command exercises contenteditable/input, not the host API.
+  const editable = editorNode.querySelector('[data-block-id="intro"] .oe-heading')
+  assert(editable !== null, 'real editable heading field is mounted')
+  editable.focus()
+  const browserSelection = document.getSelection()
+  browserSelection.selectAllChildren(editable)
+  const acceptedInput = document.execCommand('insertText', false, 'Native heading input')
+  assert(acceptedInput, 'Chromium accepts native heading input')
+  await new Promise(resolve => setTimeout(resolve, 20))
+  assert(labels(toc).includes('Native heading input'), 'native heading input updates TOC')
+
   editor.render(documentData(heading('new', 'Replacement', 2), tocBlock, heading('nested', 'Subheading', 4)))
   equal(labels(editorNode.querySelector('nav.rector-toc')), ['Replacement', 'Subheading'],
     'whole-document replacement updates TOC')
@@ -110,6 +132,16 @@ try {
     { source: renderedSource })
   equal(labels(articleNode.querySelector('nav.rector-toc')), ['Last title'],
     'incremental renderTo updates existing TOC')
+
+  // Untrusted heading markup must be rendered strictly as text, never as HTML.
+  renderedSource.setDocument(documentData(
+    heading('unsafe', '<img src=x onerror="window.__tocExecuted=true">Safe label'),
+  ))
+  const safeText = articleNode.querySelector('nav.rector-toc')
+  equal(labels(safeText), ['Safe label'], 'untrusted heading HTML yields plain TOC label')
+  assert(!window.__tocExecuted, 'untrusted heading HTML is never executed')
+  renderTocDocument(renderer, documentData(heading('last', 'Last title'), tocBlock), articleNode,
+    { source: renderedSource })
 
   const mounted = articleNode.querySelector('nav.rector-toc')
   renderer.destroy()
