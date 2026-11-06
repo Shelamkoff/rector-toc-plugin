@@ -99,8 +99,28 @@ export function createTocPlugin(options = {}) {
             if (!instanceDestroyed && !blockContext.signal.aborted) view.render(data, headings)
           }
           updateView(source.getHeadings())
-          const unsubscribe = source.subscribe(updateView)
-          blockContext.signal.addEventListener('abort', unsubscribe, { once: true })
+          let unsubscribe
+          try {
+            unsubscribe = source.subscribe(updateView)
+            if (typeof unsubscribe !== 'function') {
+              throw new TypeError('TOC source.subscribe must return an unsubscribe function')
+            }
+          } catch (error) {
+            view.destroy()
+            throw error
+          }
+          let subscriptionReleased = false
+          const releaseSubscription = () => {
+            if (subscriptionReleased) return
+            subscriptionReleased = true
+            blockContext.signal.removeEventListener('abort', releaseSubscription)
+            unsubscribe()
+          }
+          // An application-owned source may abort the block synchronously during
+          // subscribe(). Registering a listener after that would retain a dead
+          // subscription forever. It must also be released at most once.
+          if (blockContext.signal.aborted) releaseSubscription()
+          else blockContext.signal.addEventListener('abort', releaseSubscription, { once: true })
           return {
             element: view.element,
             read() { return { ...data } },
@@ -110,8 +130,8 @@ export function createTocPlugin(options = {}) {
             destroy() {
               if (instanceDestroyed) return
               instanceDestroyed = true
-              unsubscribe()
-              view.destroy()
+              try { releaseSubscription() }
+              finally { view.destroy() }
             },
           }
         },
