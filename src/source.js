@@ -56,21 +56,26 @@ export function createTocSource(options = {}) {
     if (!editor || typeof editor.save !== 'function' || typeof editor.on !== 'function') {
       throw new TypeError('bindEditor requires a Rector editor handle')
     }
-    setDocument(editor.save())
     let active = true
     let offCommitted = () => {}
     let offDestroyed = () => {}
     const unbind = () => {
       if (!active) return
       active = false
-      binding = null
+      if (binding === unbind) binding = null
       offCommitted()
       offDestroyed()
     }
+    // Claim this source before calling application-owned save/observers.
+    // They can synchronously destroy it, attempt a second binding, or throw.
+    binding = unbind
     try {
-      offCommitted = editor.on('transaction:committed', event => {
+      setDocument(editor.save())
+      assertLive()
+      if (!active) throw new Error('TOC source retired during editor binding')
+
+      const committed = editor.on('transaction:committed', event => {
         if (!active) return
-        // Reorder, whole-document replacement, or editing a Heading can affect TOC.
         const relevant = event.changes.some(change =>
           change.kind === 'document.replace' || change.kind === 'block.move'
           || (change.kind === 'block.insert' || change.kind === 'block.remove')
@@ -81,8 +86,13 @@ export function createTocSource(options = {}) {
           try { setDocument(editor.save()) } catch (error) { report(error) }
         }
       })
-      offDestroyed = editor.on('editor:destroyed', unbind)
-      binding = unbind
+      if (typeof committed !== 'function') throw new TypeError('Editor event subscription must return an unsubscribe function')
+      if (!active) { committed(); throw new Error('TOC source retired during editor binding') }
+      offCommitted = committed
+      const destroyed = editor.on('editor:destroyed', unbind)
+      if (typeof destroyed !== 'function') throw new TypeError('Editor event subscription must return an unsubscribe function')
+      if (!active) { destroyed(); throw new Error('TOC source retired during editor binding') }
+      offDestroyed = destroyed
       return unbind
     } catch (error) {
       unbind()
