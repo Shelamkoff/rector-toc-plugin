@@ -16,10 +16,13 @@ export function normalizeTocData(value) {
   if (Object.keys(value).some(key => !keys.includes(key))) {
     throw new TypeError('Unknown TOC data property')
   }
-  const title = value.title ?? DEFAULT_TOC_DATA.title
-  const minLevel = value.minLevel ?? DEFAULT_TOC_DATA.minLevel
-  const maxLevel = value.maxLevel ?? DEFAULT_TOC_DATA.maxLevel
-  const numbered = value.numbered ?? DEFAULT_TOC_DATA.numbered
+  // Treat caller-owned records as data; inherited prototype properties
+  // are not authored TOC settings and must never influence persisted JSON.
+  const own = key => Object.hasOwn(value, key) ? value[key] : undefined
+  const title = own('title') ?? DEFAULT_TOC_DATA.title
+  const minLevel = own('minLevel') ?? DEFAULT_TOC_DATA.minLevel
+  const maxLevel = own('maxLevel') ?? DEFAULT_TOC_DATA.maxLevel
+  const numbered = own('numbered') ?? DEFAULT_TOC_DATA.numbered
   if (typeof title !== 'string') throw new TypeError('TOC title must be a string')
   if (!Number.isInteger(minLevel) || !Number.isInteger(maxLevel)
     || minLevel < 2 || maxLevel > 6 || minLevel > maxLevel) {
