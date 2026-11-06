@@ -68,8 +68,10 @@ export function createTocSource(options = {}) {
   }
   const publishHeadings = next => {
     assertLive()
-    if (sameHeadings(headings, next)) return
+    // Even a document with equal headings supersedes previously staged work.
+    // Notification deduplication and accepted-document freshness are distinct.
     revision++
+    if (sameHeadings(headings, next)) return
     headings = next
     if (delivering) { superseded = true; return }
     delivering = true
