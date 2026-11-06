@@ -100,3 +100,16 @@ test('only real inline tokens resolve; entity-escaped and markup-split braces re
     'Literal {{ref}} / linked Alice &lt;Admin&gt; / split {{ref}}',
   ])
 })
+
+test('TOC data normalization ignores inherited settings and reads only authored keys', () => {
+  const polluted = Object.create({
+    title: 'Unexpected title',
+    minLevel: 6,
+    maxLevel: 6,
+    numbered: true,
+  })
+  polluted.numbered = false
+  assert.deepEqual(tocSchema.encode(polluted).data, {
+    title: 'Table of contents', minLevel: 2, maxLevel: 6, numbered: false,
+  })
+})
