@@ -81,3 +81,30 @@ test('observer exceptions are isolated and a source cannot bind twice', () => {
   assert.throws(() => source.bindEditor(editor), /already bound/)
   source.destroy()
 })
+
+
+test('destroy during initial binding does not subscribe a disposed source', () => {
+  const editor = createMockEditor(doc(heading('a', 'A')))
+  const source = createTocSource()
+  source.subscribe(() => source.destroy())
+  assert.throws(() => source.bindEditor(editor), /destroyed|retired/i)
+  assert.equal(editor.listeners('transaction:committed'), 0)
+  assert.equal(editor.listeners('editor:destroyed'), 0)
+})
+
+test('a source cannot be rebound reentrantly during initial document notification', () => {
+  const editor = createMockEditor(doc(heading('a', 'A')))
+  const foreignEditor = createMockEditor(doc(heading('foreign', 'F')))
+  const source = createTocSource()
+  let rejected = false
+  source.subscribe(() => {
+    try { source.bindEditor(foreignEditor) }
+    catch (error) { rejected = /already bound/.test(error.message) }
+  })
+  const unbind = source.bindEditor(editor)
+  assert.equal(rejected, true)
+  assert.equal(foreignEditor.listeners('transaction:committed'), 0)
+  assert.deepEqual(source.getHeadings().map(item => item.text), ['A'])
+  unbind()
+  source.destroy()
+})
