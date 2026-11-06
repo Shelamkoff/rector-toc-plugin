@@ -111,7 +111,9 @@ try {
     })
     if (response.exceptionDetails) throw new Error('Browser exception: ' + JSON.stringify(response.exceptionDetails))
     const value = JSON.parse(response.result?.value ?? 'null')
-    if (value?.url !== url || !['pass', 'fail'].includes(value.status)) return null
+    // Fragment navigation is part of the TOC's public behavior. A hash
+    // change stays on the same test page and must not hide a completed test.
+    if (value?.url?.split('#')[0] !== url || !['pass', 'fail'].includes(value.status)) return null
     return value
   }, 120000)
   if (result.status !== 'pass') throw new Error('Real Rector browser integration failed:\n' + result.result)
