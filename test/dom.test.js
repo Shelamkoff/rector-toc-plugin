@@ -278,3 +278,49 @@ test('a failing renderer unsubscribe cannot prevent navigation cleanup', () => {
   assert.doesNotThrow(() => renderer.destroy(nav))
   assert.equal(calls, 1)
 })
+
+
+test('a failed TOC block initialization releases its detached navigation listener', () => {
+  let navigation
+  const ownerDocument = {
+    createElement(tag) {
+      const element = document.createElement(tag)
+      if (tag === 'nav') navigation = element
+      return element
+    },
+  }
+  const plugin = createTocPlugin({
+    injectStyles: false,
+    source: {
+      getHeadings() { throw new Error('Cannot get heading snapshot') },
+      subscribe() { throw new Error('Must not subscribe after failed snapshot') },
+    },
+  })
+  assert.throws(() => plugin.setup({}).create(plugin.schema.createDefault(), {
+    ownerDocument,
+    signal: new AbortController().signal,
+  }), /Cannot get heading snapshot/)
+  assert.ok(navigation, 'a navigation view was allocated before the source failure')
+  assert.equal(navigation.events.get('click')?.size ?? 0, 0,
+    'failed TOC block construction must retire its DOM click listener')
+})
+
+test('a rejected initial TOC block data releases its detached navigation listener', () => {
+  let navigation
+  const ownerDocument = {
+    createElement(tag) {
+      const element = document.createElement(tag)
+      if (tag === 'nav') navigation = element
+      return element
+    },
+  }
+  const source = { getHeadings() { return [] }, subscribe() { return () => {} } }
+  const plugin = createTocPlugin({ source, injectStyles: false })
+  assert.throws(() => plugin.setup({}).create({ title: null }, {
+    ownerDocument,
+    signal: new AbortController().signal,
+  }), /title/)
+  assert.ok(navigation)
+  assert.equal(navigation.events.get('click')?.size ?? 0, 0,
+    'invalid initial TOC data must not leak a view event listener')
+})
