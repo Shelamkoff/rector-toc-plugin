@@ -232,3 +232,28 @@ test('prepared TOC projections publish only after commit and do not repeat notif
   source.destroy()
   assert.throws(() => source.prepareDocument(doc(heading('h', 'Post-destroy'))), /destroyed/)
 })
+
+
+test('a prepared TOC snapshot cannot overwrite a more recently published document', () => {
+  const source = createTocSource({ document: doc(heading('h', 'Original')) })
+  const published = []
+  source.subscribe(entries => published.push(entries.map(x => x.text).join(',')))
+
+  const pending = source.prepareDocument(doc(heading('h', 'Outdated')))
+  source.setDocument(doc(heading('h', 'Current')))
+  pending()
+
+  assert.deepEqual(source.getHeadings().map(x => x.text), ['Current'])
+  assert.deepEqual(published, ['Current'])
+  source.destroy()
+})
+
+test('two prepared snapshots committed out of order retain the newer publication', () => {
+  const source = createTocSource({ document: doc(heading('h', 'Original')) })
+  const previous = source.prepareDocument(doc(heading('h', 'Earlier')))
+  const latest = source.prepareDocument(doc(heading('h', 'Later')))
+  latest()
+  previous()
+  assert.deepEqual(source.getHeadings().map(x => x.text), ['Later'])
+  source.destroy()
+})
