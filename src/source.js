@@ -29,6 +29,8 @@ export function createTocSource(options = {}) {
   let headings = collectTocHeadings(options.document ?? EMPTY_DOCUMENT, extraction)
   let destroyed = false
   let binding = null
+  let delivering = false
+  let superseded = false
   const subscribers = new Set()
   const assertLive = () => {
     if (destroyed) throw new Error('TOC source is destroyed')
@@ -44,9 +46,23 @@ export function createTocSource(options = {}) {
     const next = collectTocHeadings(documentData, extraction)
     if (sameHeadings(headings, next)) return
     headings = next
-    for (const callback of [...subscribers]) {
-      if (!subscribers.has(callback)) continue
-      try { callback(headings) } catch (error) { report(error) }
+    if (delivering) { superseded = true; return }
+    delivering = true
+    try {
+      do {
+        superseded = false
+        const snapshot = headings
+        for (const callback of [...subscribers]) {
+          if (destroyed) break
+          // A reentrant update supersedes this notification; restart with
+          // the current snapshot rather than send duplicate/stale values.
+          if (headings !== snapshot) { superseded = true; break }
+          if (!subscribers.has(callback)) continue
+          try { callback(snapshot) } catch (error) { report(error) }
+        }
+      } while (superseded && !destroyed)
+    } finally {
+      delivering = false
     }
   }
 
