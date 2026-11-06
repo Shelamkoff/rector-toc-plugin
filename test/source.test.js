@@ -108,3 +108,51 @@ test('a source cannot be rebound reentrantly during initial document notificatio
   unbind()
   source.destroy()
 })
+
+
+test('destroy finishes independent unsubscribe operations even if one throws', () => {
+  const failures = []
+  const source = createTocSource({ onError: error => failures.push(error.message) })
+  const docSnapshot = doc(heading('a', 'A'))
+  const listeners = new Map()
+  const editor = {
+    save: () => docSnapshot,
+    on(type, listener) {
+      const items = listeners.get(type) ?? new Set()
+      items.add(listener)
+      listeners.set(type, items)
+      return () => {
+        items.delete(listener)
+        if (type === 'transaction:committed') throw new Error('failing unsubscribe')
+      }
+    },
+  }
+  source.bindEditor(editor)
+  assert.doesNotThrow(() => source.destroy())
+  assert.deepEqual(failures, ['failing unsubscribe'])
+  assert.equal(listeners.get('transaction:committed').size, 0)
+  assert.equal(listeners.get('editor:destroyed').size, 0)
+  assert.throws(() => source.getHeadings(), /destroyed/)
+  assert.doesNotThrow(() => source.destroy())
+})
+
+test('destroy prevents a callback from rebinding a source while unsubscribing', () => {
+  const source = createTocSource()
+  const other = createMockEditor(doc(heading('elsewhere', 'Elsewhere')))
+  const warnings = []
+  const editor = {
+    save: () => doc(heading('a', 'A')),
+    on(type) {
+      return () => {
+        if (type === 'transaction:committed') {
+          try { source.bindEditor(other) }
+          catch (error) { warnings.push(error.message) }
+        }
+      }
+    },
+  }
+  source.bindEditor(editor)
+  source.destroy()
+  assert.equal(other.listeners('transaction:committed'), 0)
+  assert.deepEqual(warnings, ['TOC source is destroyed'])
+})
