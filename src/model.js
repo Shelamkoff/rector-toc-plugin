@@ -67,6 +67,7 @@ function richTextToText(html, resolveInlineToken) {
 
   let result = ''
   let rawText = ''
+  let commentTerminatorExhausted = false
   const flushText = () => {
     if (!rawText) return
     if (resolveInlineToken) {
@@ -94,8 +95,15 @@ function richTextToText(html, resolveInlineToken) {
       continue
     }
     if (html.startsWith('<!--', i)) {
-      const end = html.indexOf('-->', i + 4)
-      if (end === -1) { rawText += html[i++]; continue }
+      // The first unsuccessful search proves no later terminator exists.
+      // Preserve existing literal-tail semantics without rescanning it for
+      // every subsequent opener (otherwise malformed input is quadratic).
+      const end = commentTerminatorExhausted ? -1 : html.indexOf('-->', i + 4)
+      if (end === -1) {
+        commentTerminatorExhausted = true
+        rawText += html[i++]
+        continue
+      }
       flushText()
       i = end + 3
       continue
